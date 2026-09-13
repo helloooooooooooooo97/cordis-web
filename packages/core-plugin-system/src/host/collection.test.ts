@@ -40,6 +40,7 @@ test('pluginsCollection lists installed plugins and sandboxes in one table', asy
           lastRunAt: null,
           hasHost: true,
           hasWeb: true,
+          codeVersion: 'abc123def456',
           shell: defaultStoreShell(),
         },
       ]),
@@ -82,11 +83,13 @@ test('pluginsCollection lists installed plugins and sandboxes in one table', asy
   assert.equal(demo?.sandbox, undefined)
   assert.equal(demo?.shellWidth, defaultStoreShell().width)
   assert.equal(demo?.hasWeb, true)
+  assert.equal(demo?.codeVersion, 'abc123def456')
   assert.equal(demo?.headless, undefined)
   assert.equal(draft?.sandbox, true)
   assert.equal(draft?.installed, undefined)
   assert.equal(draft?.running, undefined)
   assert.equal(draft?.bytes, undefined)
+  assert.equal(draft?.codeVersion, undefined)
   assert.equal(draft?.shellWidth, undefined)
   assert.deepEqual(
     spec.actions?.map((item) => item.id),
@@ -108,6 +111,8 @@ test('pluginsCollection lists installed plugins and sandboxes in one table', asy
   assert.ok(spec.schema.columns?.includes('sandbox'))
   assert.ok(spec.schema.columns?.includes('installed'))
   assert.ok(spec.schema.columns?.includes('tags'))
+  assert.ok(spec.schema.columns?.includes('codeVersion'))
+  assert.equal(spec.schema.fields.codeVersion?.label, '代码版本')
   assert.equal(spec.schema.fields.tags?.writable, true)
   assert.equal(spec.schema.fields.emoji?.writable, true)
   assert.deepEqual(spec.actions?.find((item) => item.id === 'start')?.when, { installed: true, running: false })

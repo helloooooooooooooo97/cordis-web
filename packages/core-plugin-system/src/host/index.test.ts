@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { Context } from 'cordis'
 import type { CatalogEntry } from '@biu/host-hub'
 import { PluginStoreService, defaultPluginDir, defaultStatePath } from './index.ts'
+import { hashInstalledPluginCode } from './store.ts'
 
 function stubHub(ctx: Context) {
   const adopted: string[] = []
@@ -175,12 +176,48 @@ test('web-only plugin opens without host.js', async () => {
     const sandboxes = await store.listSandboxes()
     assert.equal(sandboxes.find((row) => row.id === 'store-banner')?.hasWeb, true)
     await store.openPlugin('store-banner')
-    // web 入口会带上内容 hash 版本号（?v=...），用于让前端在重打包后重新加载。
-    assert.match(
-      String(forks.get('store-banner')?.web),
-      /^\/api\/plugin-store\/files\/store-banner\/web\.js\?v=[0-9a-f]+$/,
+    const listed = (await store.list()).find((row) => row.id === 'store-banner')
+    assert.ok(listed?.codeVersion)
+    assert.match(listed.codeVersion, /^[0-9a-f]{12}$/)
+    // web 入口会带上整包代码 hash（host + web），用于让前端在重打包后重新加载。
+    assert.equal(
+      forks.get('store-banner')?.web,
+      `/api/plugin-store/files/store-banner/web.js?v=${listed.codeVersion}`,
     )
+    assert.equal(listed.codeVersion, await hashInstalledPluginCode(join(dir, '.plugin', 'store-banner')))
     await assert.rejects(() => store.readInstalledFile('store-banner', 'host.js'))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('codeVersion hashes host.js and web.js together', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'plugin-root-'))
+  try {
+    const ctx = new Context()
+    stubHub(ctx)
+    const pluginDir = join(dir, '.plugin')
+    const store = new PluginStoreService(ctx, pluginDir, join(dir, 'store.json'), join(dir, '.plugin-dev')).open()
+    await store.initSandbox({
+      id: 'store-both',
+      name: 'Both',
+      shell: { width: 360, height: 240 },
+      hostJs: `export const name = 'store-both'\nexport function apply() {}\n`,
+      webJs: `export const name = 'store-both-web'\nexport const inject = ['slots']\nexport function apply() {}\n`,
+    })
+    await store.pack('store-both')
+    const packed = join(pluginDir, 'store-both')
+    const before = await hashInstalledPluginCode(packed)
+    const listed = (await store.list()).find((row) => row.id === 'store-both')
+    assert.equal(listed?.codeVersion, before)
+    assert.ok(listed?.hasHost)
+    assert.ok(listed?.hasWeb)
+    await writeFile(join(packed, 'host.js'), `export const name = 'store-both'\nexport function apply() { return 1 }\n`)
+    const afterHost = await hashInstalledPluginCode(packed)
+    assert.notEqual(afterHost, before)
+    await writeFile(join(packed, 'web.js'), `export const name = 'store-both-web'\nexport function apply() { return 2 }\n`)
+    const afterWeb = await hashInstalledPluginCode(packed)
+    assert.notEqual(afterWeb, afterHost)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

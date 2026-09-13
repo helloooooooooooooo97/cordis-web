@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { diffCharStats } from './line-diff.ts'
+import { diffLineStats } from './line-diff.ts'
 
 export type ContentTurnFile = {
   path: string
@@ -104,7 +104,7 @@ export class ContentTurnStore {
   summaries(sessionId: string, turn: number): ContentEditSummary[] {
     return this.listFiles(sessionId, turn)
       .map((row) => {
-        const stats = diffCharStats(row.before, row.after)
+        const stats = diffLineStats(row.before, row.after)
         return {
           path: row.path,
           title: row.title,

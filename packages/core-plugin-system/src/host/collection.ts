@@ -40,6 +40,7 @@ function asInstalledRecord(row: StoreListing): DbRecord {
     lastRunAt: row.lastRunAt,
     hasHost: row.hasHost,
     hasWeb: row.hasWeb,
+    codeVersion: row.codeVersion,
     headless: row.headless === true,
     ...(row.headless || !shell
       ? {}
@@ -108,7 +109,7 @@ export function pluginsCollection(store: PluginStoreService): CollectionSpec {
       route: '/plugins',
       title: '插件',
       inspector: true,
-      blurb: '这是插件（可安装的小程序），不是代理。用户说「再开一个 agent」请去 /sessions db_create，不要在这张表 create。已安装（.plugin）和沙箱（.plugin-dev）同一张表。列表 db_list /plugins。README 用 db_content /plugins/<id>。页面块插件先读介绍里的「示例写法」再写 :::pageBlock。name 等只读（facet/tags 仍可写）。不能 db_create。窗口尺寸看 shellWidth/shellHeight。安装只能 sandbox 再 pack：先 db_action path=/plugins/<插件id> action=sandbox 建 .plugin-dev/<id>/（记录可以还不存在），写完代码再 action=pack 打进 .plugin。不要直写 .plugin。start=打开已安装插件窗口（when：installed 且未 running）；stop=关掉运行中的插件（when：installed 且 running）；uninstall=删除 .plugin/<id>/（沙箱还在则这行还在）。',
+      blurb: '这是插件（可安装的小程序），不是代理。用户说「再开一个 agent」请去 /sessions db_create，不要在这张表 create。已安装（.plugin）和沙箱（.plugin-dev）同一张表。列表 db_list /plugins。README 用 db_content /plugins/<id>。页面块插件先读介绍里的「示例写法」再写 :::pageBlock。name 等只读（facet/tags 仍可写）。不能 db_create。窗口尺寸看 shellWidth/shellHeight。codeVersion 是已安装 host.js+web.js 的内容短哈希，和加载 URL 的 v 参数相同。安装只能 sandbox 再 pack：先 db_action path=/plugins/<插件id> action=sandbox 建 .plugin-dev/<id>/（记录可以还不存在），写完代码再 action=pack 打进 .plugin。不要直写 .plugin。start=打开已安装插件窗口（when：installed 且未 running）；stop=关掉运行中的插件（when：installed 且 running）；uninstall=删除 .plugin/<id>/（沙箱还在则这行还在）。',
       order: 30,
       icon: 'puzzle-piece',
     },
@@ -130,6 +131,7 @@ export function pluginsCollection(store: PluginStoreService): CollectionSpec {
         'shellHeight',
         'hasHost',
         'hasWeb',
+        'codeVersion',
         'headless',
       ],
       fields: {
@@ -147,6 +149,7 @@ export function pluginsCollection(store: PluginStoreService): CollectionSpec {
         lastRunAt: { type: 'datetime', label: '上次运行' },
         hasHost: { type: 'boolean', label: 'Host' },
         hasWeb: { type: 'boolean', label: 'Web' },
+        codeVersion: { type: 'string', label: '代码版本' },
         headless: { type: 'boolean', label: '无头' },
         author: { type: 'string', label: '作者' },
         authorUrl: { type: 'url', label: '作者链接' },

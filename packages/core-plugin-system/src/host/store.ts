@@ -33,6 +33,8 @@ export type StoreListing = {
   lastRunAt: number | null
   hasHost: boolean
   hasWeb: boolean
+  /** 已安装 host.js + web.js 的内容短哈希，与加载 URL 的 v 参数一致。 */
+  codeVersion?: string
   headless?: boolean
   shell?: StoreShell
 }
@@ -47,10 +49,27 @@ type StoreHub = {
 
 const ALLOWED_FILES = new Set(['manifest.json', 'host.js', 'web.js'])
 const README_FILE = 'README.md'
+/** pack 进 .plugin 的可执行代码；版本号按这两个文件一起算。 */
+const PLUGIN_CODE_FILES = ['host.js', 'web.js'] as const
+
+/** 已安装插件代码短版本：host.js 与 web.js 按文件名顺序一起 SHA-1，取前 12 位。 */
+export async function hashInstalledPluginCode(dir: string): Promise<string | undefined> {
+  const hash = createHash('sha1')
+  let any = false
+  for (const name of PLUGIN_CODE_FILES) {
+    const file = join(dir, name)
+    if (!existsSync(file)) continue
+    hash.update(name)
+    hash.update('\0')
+    hash.update(await readFile(file))
+    any = true
+  }
+  return any ? hash.digest('hex').slice(0, 12) : undefined
+}
 
 export function storeWebUrl(id: string, version?: string | number) {
   const base = `/api/plugin-store/files/${encodeURIComponent(id)}/web.js`
-  // 带上版本号（通常是 web.js 的 mtime），让前端的「挂载键」随每次重打包变化，
+  // 带上整包代码短哈希（host + web），让前端的「挂载键」随每次重打包变化，
   // 从而触发真正的卸载 + 重新 import；否则前端会一直用最早加载的模块实例。
   return version === undefined ? base : `${base}?v=${encodeURIComponent(String(version))}`
 }
@@ -319,6 +338,7 @@ export class PluginStoreService extends Service {
       const manifest = await readManifest(dir)
       const enabled = this.isEnabled(manifest.id)
       const stats = await pluginDirStats(dir)
+      const codeVersion = await hashInstalledPluginCode(dir)
       items.push({
         ...manifest,
         enabled,
@@ -329,6 +349,7 @@ export class PluginStoreService extends Service {
         lastRunAt: this.state.lastRunAt[manifest.id] ?? null,
         hasHost: stats.hasHost,
         hasWeb: stats.hasWeb,
+        ...(codeVersion ? { codeVersion } : {}),
         ...(manifest.headless ? { headless: true } : { shell: parseStoreShell(manifest.shell) }),
       })
     }
@@ -457,17 +478,7 @@ export class PluginStoreService extends Service {
     const webFile = join(dir, 'web.js')
     const hostCode = existsSync(hostFile) ? (await readFile(hostFile, 'utf8')).trim() : ''
     const hasWeb = existsSync(webFile)
-    // 用 web.js 内容的短 hash 作为版本号：只要代码变了就一定变，
-    // 且不受写入时间戳精度影响（同一毫秒内重打包也能区分）。
-    let webVersion: string | undefined
-    if (hasWeb) {
-      try {
-        const body = await readFile(webFile)
-        webVersion = createHash('sha1').update(body).digest('hex').slice(0, 12)
-      } catch {
-        webVersion = undefined
-      }
-    }
+    const codeVersion = await hashInstalledPluginCode(dir)
     if (!hostCode && !hasWeb) throw new Error(`plugin ${manifest.id} has neither host nor web`)
     const mod = (hostCode
       ? await importHostFile(hostFile)
@@ -481,7 +492,7 @@ export class PluginStoreService extends Service {
       inject: mod.inject,
       togglable: true,
       enabled: true,
-      web: hasWeb ? storeWebUrl(manifest.id, webVersion) : undefined,
+      web: hasWeb ? storeWebUrl(manifest.id, codeVersion) : undefined,
       packageName: `store:${manifest.id}`,
     }
     await this.hub().adopt(entry)
