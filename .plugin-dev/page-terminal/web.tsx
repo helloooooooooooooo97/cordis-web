@@ -572,13 +572,11 @@ function IconButton({
 
 function GearIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.4" />
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path
-        d="M8 1.8v1.6M8 12.6v1.6M14.2 8h-1.6M3.4 8H1.8M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1M12.4 12.4l-1.1-1.1M4.7 4.7 3.6 3.6"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M6.455 1.45A.5.5 0 0 1 6.952 1h2.096a.5.5 0 0 1 .497.45l.186 1.858a4.996 4.996 0 0 1 1.466.848l1.703-.769a.5.5 0 0 1 .639.206l1.047 1.814a.5.5 0 0 1-.14.656l-1.517 1.09a5.026 5.026 0 0 1 0 1.694l1.516 1.09a.5.5 0 0 1 .141.656l-1.047 1.814a.5.5 0 0 1-.639.206l-1.703-.768c-.433.36-.928.649-1.466.847l-.186 1.858a.5.5 0 0 1-.497.45H6.952a.5.5 0 0 1-.497-.45l-.186-1.858a4.993 4.993 0 0 1-1.466-.848l-1.703.769a.5.5 0 0 1-.639-.206l-1.047-1.814a.5.5 0 0 1 .14-.656l1.517-1.09a5.033 5.026 0 0 1 0-1.694l-1.516-1.09a.5.5 0 0 1-.141-.656L2.46 3.593a.5.5 0 0 1 .639-.206l1.703.769c.433-.36.928-.65 1.466-.848l.186-1.858Zm-.177 7.567-.022-.037a2 2 0 0 1 3.466-1.997l.022.037a2 2 0 0 1-3.466 1.997Z"
       />
     </svg>
   )
@@ -690,9 +688,10 @@ function useZoom() {
   return { zoomed, start, stop, slotRef }
 }
 
-/** 终端设置面板：配置后端缓冲池参数（全局生效）。 */
+/** 终端设置：小悬浮窗，贴标题栏齿轮，点窗外关闭。 */
 function SettingsPanel({ onClose }: { onClose: () => void }) {
   const React2 = React
+  const box = React2.useRef<HTMLDivElement | null>(null)
   const [state, setState] = React2.useState<{
     loading: boolean
     error?: string
@@ -715,6 +714,14 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
       cancelled = true
     }
   }, [])
+
+  React2.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [onClose])
 
   const patch = (key: string, value: number) => {
     setState((cur) => ({ ...cur, settings: { ...(cur.settings ?? {}), [key]: value } }))
@@ -739,11 +746,12 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr auto',
-          gap: 4,
-          padding: '6px 10px',
+          gap: '2px 10px',
+          padding: '8px 0',
+          borderTop: '1px solid var(--dsw-border, rgba(242,241,237,0.1))',
         }}
       >
-        <span style={{ color: 'var(--dsw-label-2, rgba(242,241,237,0.72))' }}>{label}</span>
+        <span style={{ color: 'var(--dsw-label, #f0efed)', fontWeight: 600 }}>{label}</span>
         <input
           type="number"
           value={value ?? ''}
@@ -752,19 +760,21 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           disabled={state.loading}
           onChange={(event) => patch(key, Number(event.target.value))}
           style={{
-            width: 76,
-            border: '1px solid var(--dsw-border, rgba(242,241,237,0.1))',
-            borderRadius: 5,
-            padding: '2px 6px',
-            background: 'color-mix(in srgb, var(--dsw-bg, #191919) 60%, transparent)',
+            width: 64,
+            height: 26,
+            border: 0,
+            borderRadius: 7,
+            padding: '0 8px',
+            background: 'var(--dsw-hover, rgba(242,241,237,0.08))',
             color: 'var(--dsw-label, #f0efed)',
             font: 'inherit',
             textAlign: 'right',
+            outline: 'none',
           }}
         />
-        <span style={{ gridColumn: '1 / -1', color: 'var(--dsw-label-3, rgba(242,241,237,0.45))', fontSize: 10 }}>
+        <span style={{ gridColumn: '1 / -1', color: 'var(--dsw-label-3, rgba(242,241,237,0.45))', fontSize: 11, lineHeight: 1.4 }}>
           {hint}
-          {limit ? `（${limit.min}–${limit.max}）` : ''}
+          {limit ? ` · ${limit.min}–${limit.max}` : ''}
         </span>
       </label>
     )
@@ -772,38 +782,36 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div
+      ref={box}
+      role="dialog"
+      aria-label="终端设置"
       style={{
-        borderBottom: '1px solid var(--dsw-border, rgba(242,241,237,0.1))',
-        background: 'color-mix(in srgb, var(--dsw-bg, #191919) 80%, transparent)',
+        position: 'absolute',
+        top: 'calc(100% + 6px)',
+        right: 0,
+        zIndex: 40,
+        width: 268,
+        padding: '10px 12px 8px',
+        border: '1px solid var(--dsw-border, rgba(242,241,237,0.12))',
+        borderRadius: 10,
+        background: 'color-mix(in srgb, var(--dsw-sidebar, #222220) 92%, #111)',
+        boxShadow: '0 12px 32px rgba(0,0,0,0.42)',
+        color: 'var(--dsw-label-2, rgba(242,241,237,0.72))',
+        font: '12px ui-sans-serif, system-ui, sans-serif',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          height: 26,
-          padding: '0 10px',
-          color: 'var(--dsw-label-3, rgba(242,241,237,0.45))',
-        }}
-      >
-        缓冲池设置
-        <span style={{ flex: 1 }} />
-        {typeof state.sessions === 'number' ? <span style={{ marginRight: 8 }}>当前 {state.sessions} 个会话</span> : null}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="关闭设置"
-          style={{ border: 0, padding: 0, background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer' }}
-        >
-          收起
-        </button>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '2px 0 8px' }}>
+        <span style={{ color: 'var(--dsw-label, #f0efed)', fontWeight: 600, fontSize: 13 }}>设置</span>
+        {typeof state.sessions === 'number' ? (
+          <span style={{ color: 'var(--dsw-label-3, rgba(242,241,237,0.45))' }}>{state.sessions} 个后台会话</span>
+        ) : null}
       </div>
       {state.error ? (
-        <div style={{ padding: '6px 10px', color: '#ff6369' }}>读取失败：{state.error}</div>
+        <div style={{ padding: '6px 0', color: '#ff6369' }}>读取失败：{state.error}</div>
       ) : (
         <>
-          {row('maxSessions', '后台保留终端数', '关掉页面后仍留在后台的会话数量，超出按最久未用淘汰')}
-          {row('bufferKB', '回放缓冲 (KB)', '每个会话最多缓存的输出，用于重连时回放')}
+          {row('maxSessions', '后台保留', '关掉页面后仍留着的会话，超出按最久未用淘汰')}
+          {row('bufferKB', '回放缓冲 KB', '每个会话缓存的输出，重连时回放')}
           {row('replayLines', '回放行数', '重连时最多回放多少行')}
         </>
       )}
@@ -820,11 +828,8 @@ function PageTerminal({
   update: (patch: Record<string, unknown>) => void
   writable: boolean
 }) {
-  const title = typeof data.title === 'string' && data.title ? data.title : DEFAULTS.title
-  const height = typeof data.height === 'number' && data.height > 0 ? Math.min(900, data.height) : DEFAULTS.height
-  // 会话键：存在块数据里，保证同一个块刷新/切页都能连回同一个 shell。
-  // 没有就现生成一个并写回（writeable 时才写），生成后跟着 markdown 走。
   const [settingsOpen, setSettingsOpen] = React.useState(false)
+  const settingsWrap = React.useRef<HTMLDivElement | null>(null)
   const zoom = useZoom()
   const sessionKey = typeof data.sid === 'string' && data.sid ? data.sid : ''
   useEffect(() => {
@@ -832,6 +837,20 @@ function PageTerminal({
     const sid = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
     update({ sid })
   }, [sessionKey, writable, update])
+
+  React.useEffect(() => {
+    if (!settingsOpen) return
+    const onDown = (event: MouseEvent) => {
+      const node = settingsWrap.current
+      if (!node) return
+      if (event.target instanceof Node && node.contains(event.target)) return
+      setSettingsOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [settingsOpen])
+
+  const height = typeof data.height === 'number' && data.height > 0 ? Math.min(900, data.height) : DEFAULTS.height
 
   // 历史存在块数据里，agent 读页面 markdown 即可看到用户跑过什么。
   const history: HistoryEntry[] = Array.isArray(data.history)
@@ -873,9 +892,9 @@ function PageTerminal({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
+          gap: 6,
           height: 30,
-          padding: '0 10px',
+          padding: '0 8px 0 10px',
           borderBottom: '1px solid var(--dsw-border, rgba(242,241,237,0.1))',
           background: 'color-mix(in srgb, var(--dsw-label, #f0efed) 4%, transparent)',
           color: 'var(--dsw-label-3, rgba(242,241,237,0.45))',
@@ -884,29 +903,13 @@ function PageTerminal({
         }}
       >
         <span style={{ flex: '0 0 auto', color: 'var(--dsw-label-2, rgba(242,241,237,0.72))' }}>终端</span>
-        {writable ? (
-          <input
-            value={title}
-            onChange={(event) => update({ title: event.target.value })}
-            aria-label="终端标题"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              border: 0,
-              background: 'transparent',
-              color: 'var(--dsw-label-3, rgba(242,241,237,0.45))',
-              font: 'inherit',
-              outline: 'none',
-            }}
-          />
-        ) : (
-          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--dsw-label-3, rgba(242,241,237,0.45))' }}>
-            {title}
-          </span>
-        )}
-        <IconButton label="设置" active={settingsOpen} onClick={() => setSettingsOpen((v) => !v)}>
-          <GearIcon />
-        </IconButton>
+        <span style={{ flex: 1 }} />
+        <div ref={settingsWrap} style={{ position: 'relative', flex: '0 0 auto' }}>
+          <IconButton label="设置" active={settingsOpen} onClick={() => setSettingsOpen((v) => !v)}>
+            <GearIcon />
+          </IconButton>
+          {settingsOpen ? <SettingsPanel onClose={() => setSettingsOpen(false)} /> : null}
+        </div>
         <IconButton
           label={zoom.zoomed ? '退出全屏' : '全屏放大'}
           active={zoom.zoomed}
@@ -916,7 +919,6 @@ function PageTerminal({
           <ExpandIcon shrink={zoom.zoomed} />
         </IconButton>
       </header>
-      {settingsOpen ? <SettingsPanel onClose={() => setSettingsOpen(false)} /> : null}
       <HistoryPanel
         history={history}
         writable={writable}

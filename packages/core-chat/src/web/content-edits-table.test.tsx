@@ -99,7 +99,7 @@ describe('ContentEditsTable', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('hides create rows and only lists content character edits', () => {
+  it('hides create rows and only lists content line edits', () => {
     const nodes: ChatNode[] = [
       { id: 'u-1', kind: 'user', text: '建页' },
       {
